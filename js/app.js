@@ -1,32 +1,73 @@
+// LeanCloud 配置
+const APP_ID = '你的AppID';
+const APP_KEY = '你的AppKey';
+const SERVER_URL = '你的ServerURL';
+
+// 初始化 LeanCloud
+AV.init({
+    appId: APP_ID,
+    appKey: APP_KEY,
+    serverURL: SERVER_URL
+});
+
 // 用户身份管理
 class IdentityManager {
     constructor() {
         this.identities = new Map();
     }
 
-    // 获取用户身份
-    getIdentity(roomId) {
-        const key = `${roomId}_identity`;
-        let identity = localStorage.getItem(key);
+    async getIdentity(roomId, userId) {
+        const key = `${roomId}_${userId}`;
         
-        if (!identity) {
-            // 生成新身份
-            identity = this.generateIdentity(roomId);
-            localStorage.setItem(key, JSON.stringify(identity));
-        } else {
-            identity = JSON.parse(identity);
+        if (this.identities.has(key)) {
+            return this.identities.get(key);
         }
         
-        return identity;
+        return await this.generateIdentityFromLeanCloud(roomId, userId);
     }
 
-    // 生成随机身份
-    generateIdentity(roomId) {
-        // 获取房间用户数
-        const roomUserCount = parseInt(localStorage.getItem(`${roomId}_count`) || '0') + 1;
-        localStorage.setItem(`${roomId}_count`, roomUserCount.toString());
-        
-        const userNumber = roomUserCount.toString().padStart(2, '0');
+    async generateIdentityFromLeanCloud(roomId, userId) {
+        try {
+            // 使用 LeanCloud 的计数器功能
+            const RoomCounter = AV.Object.extend('RoomCounter');
+            const query = new AV.Query('RoomCounter');
+            query.equalTo('roomId', roomId);
+            
+            let counter = await query.first();
+            if (!counter) {
+                counter = new RoomCounter();
+                counter.set('roomId', roomId);
+                counter.set('count', 0);
+            }
+            
+            // 原子增加计数器
+            counter.increment('count', 1);
+            await counter.save();
+            
+            const userCount = counter.get('count');
+            const userNumber = userCount.toString().padStart(2, '0');
+            const gender = Math.random() > 0.5 ? 'male' : 'female';
+            const avatar = gender === 'male' ? '🔵🐑' : '🌸🐑';
+            const color = gender === 'male' ? '#1890FF' : '#FF69B4';
+            
+            const identity = {
+                name: userNumber,
+                avatar: avatar,
+                gender: gender,
+                color: color,
+                userId: userId
+            };
+            
+            this.identities.set(`${roomId}_${userId}`, identity);
+            return identity;
+        } catch (error) {
+            console.error('生成身份失败:', error);
+            return this.generateFallbackIdentity();
+        }
+    }
+
+    generateFallbackIdentity() {
+        const userNumber = Math.floor(Math.random() * 99 + 1).toString().padStart(2, '0');
         const gender = Math.random() > 0.5 ? 'male' : 'female';
         const avatar = gender === 'male' ? '🔵🐑' : '🌸🐑';
         const color = gender === 'male' ? '#1890FF' : '#FF69B4';
@@ -35,37 +76,45 @@ class IdentityManager {
             name: userNumber,
             avatar: avatar,
             gender: gender,
-            color: color
+            color: color,
+            userId: 'fallback_' + Date.now()
         };
-    }
-
-    // 清除身份
-    clearIdentity(roomId) {
-        const key = `${roomId}_identity`;
-        localStorage.removeItem(key);
     }
 }
 
-// 聊天管理器
+// 聊天管理器 - 使用 LeanCloud 实时通信
 class ChatManager {
     constructor() {
         this.identityManager = new IdentityManager();
         this.currentRoom = null;
-        this.messages = [];
+        this.userId = this.generateUserId();
         this.lastActivity = new Date();
+        this.messageQuery = null;
+    }
+
+    generateUserId() {
+        let userId = localStorage.getItem('anonymous_chat_userId');
+        if (!userId) {
+            userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            localStorage.setItem('anonymous_chat_userId', userId);
+        }
+        return userId;
     }
 
     // 加入聊天室
-    joinRoom(roomId, roomName) {
+    async joinRoom(roomId, roomName) {
         this.currentRoom = roomId;
-        const identity = this.identityManager.getIdentity(roomId);
+        const identity = await this.identityManager.getIdentity(roomId, this.userId);
         
         // 保存房间信息
         sessionStorage.setItem('currentRoom', roomId);
         sessionStorage.setItem('roomName', roomName);
         
-        // 显示加入消息
-        this.displaySystemMessage(`${identity.avatar} 用户 ${identity.name} 加入了聊天室`);
+        // 设置消息监听
+        await this.setupMessageListener(roomId);
+        
+        // 发送加入通知
+        await this.sendSystemMessage(`${identity.avatar} 用户 ${identity.name} 加入了聊天室`);
         
         // 更新活动时间
         this.updateActivity();
@@ -73,67 +122,107 @@ class ChatManager {
         return identity;
     }
 
+    // 设置消息监听器
+    async setupMessageListener(roomId) {
+        // 创建消息查询
+        const Message = AV.Object.extend('Message');
+        this.messageQuery = new AV.Query('Message');
+        this.messageQuery.equalTo('roomId', roomId);
+        this.messageQuery.addDescending('createdAt');
+        this.messageQuery.limit(50);
+        
+        // 先加载历史消息
+        const historyMessages = await this.messageQuery.find();
+        historyMessages.reverse().forEach(message => {
+            this.displayMessage(message.toJSON());
+        });
+        
+        // 实时监听新消息
+        this.messageQuery.subscribe().then((subscription) => {
+            subscription.on('create', (message) => {
+                this.displayMessage(message.toJSON());
+            });
+        });
+    }
+
     // 发送消息
-    sendMessage(content) {
+    async sendMessage(content) {
         if (!content.trim()) return;
         
-        const identity = this.identityManager.getIdentity(this.currentRoom);
-        const message = {
-            id: Date.now(),
-            type: 'message',
-            user: identity,
-            content: content,
-            timestamp: new Date()
-        };
+        const identity = await this.identityManager.getIdentity(this.currentRoom, this.userId);
         
-        // 保存到消息列表
-        this.messages.push(message);
+        // 创建 Message 对象
+        const Message = AV.Object.extend('Message');
+        const message = new Message();
         
-        // 显示消息
-        this.displayUserMessage(message);
+        message.set('type', 'message');
+        message.set('roomId', this.currentRoom);
+        message.set('user', identity);
+        message.set('content', content);
+        message.set('timestamp', new Date());
+        
+        await message.save();
         
         // 更新活动时间
         this.updateActivity();
-        
-        // 保存到本地存储（模拟发送）
-        this.saveMessageToStorage(message);
     }
 
-    // 显示用户消息
-    displayUserMessage(message) {
+    // 发送系统消息
+    async sendSystemMessage(content) {
+        const Message = AV.Object.extend('Message');
+        const message = new Message();
+        
+        message.set('type', 'system');
+        message.set('roomId', this.currentRoom);
+        message.set('content', content);
+        message.set('timestamp', new Date());
+        
+        await message.save();
+    }
+
+    // 显示消息
+    displayMessage(messageData) {
         const messagesContainer = document.getElementById('messagesContainer');
         if (!messagesContainer) return;
         
-        const messageElement = document.createElement('div');
-        const identity = this.identityManager.getIdentity(this.currentRoom);
-        const isOwnMessage = message.user.name === identity.name;
+        if (messageData.type === 'system') {
+            this.displaySystemMessage(messageData.content);
+        } else {
+            this.displayUserMessage(messageData);
+        }
         
+        // 自动滚动到底部
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+
+    // 显示用户消息
+    displayUserMessage(messageData) {
+        const messagesContainer = document.getElementById('messagesContainer');
+        const identity = this.identityManager.getIdentity(this.currentRoom, this.userId);
+        const isOwnMessage = messageData.user.userId === this.userId;
+        
+        const messageElement = document.createElement('div');
         messageElement.className = `message ${isOwnMessage ? 'own' : ''}`;
         messageElement.innerHTML = `
-            <div class="message-avatar">${message.user.avatar}</div>
+            <div class="message-avatar">${messageData.user.avatar}</div>
             <div class="message-content">
-                <div class="message-user" style="color: ${message.user.color}">
-                    ${message.user.name} ${message.user.avatar}
+                <div class="message-user" style="color: ${messageData.user.color}">
+                    ${messageData.user.name} ${messageData.user.avatar}
                 </div>
-                <div class="message-bubble">${message.content}</div>
+                <div class="message-bubble">${messageData.content}</div>
             </div>
         `;
         
         messagesContainer.appendChild(messageElement);
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
 
     // 显示系统消息
     displaySystemMessage(content) {
         const messagesContainer = document.getElementById('messagesContainer');
-        if (!messagesContainer) return;
-        
         const messageElement = document.createElement('div');
         messageElement.className = 'system-message';
         messageElement.textContent = content;
-        
         messagesContainer.appendChild(messageElement);
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
 
     // 更新活动时间
@@ -145,46 +234,33 @@ class ChatManager {
             clearTimeout(this.cleanupTimer);
         }
         
-        // 设置10分钟清理提示
+        // 设置自动清理（10分钟无人说话）
         this.cleanupTimer = setTimeout(() => {
-            this.showCleanupWarning();
-        }, 8 * 60 * 1000); // 8分钟后显示警告
+            this.cleanupRoom();
+        }, 10 * 60 * 1000);
     }
 
-    // 显示清理警告
-    showCleanupWarning() {
+    // 清理房间
+    async cleanupRoom() {
+        if (!this.currentRoom) return;
+        
+        // 从 LeanCloud 删除所有消息
+        const Message = AV.Object.extend('Message');
+        const query = new AV.Query('Message');
+        query.equalTo('roomId', this.currentRoom);
+        
+        const messages = await query.find();
+        await AV.Object.destroyAll(messages);
+        
+        // 显示清理消息
+        this.displaySystemMessage('🗑️ 聊天室因10分钟无活动已自动清理');
+        
+        // 重置状态
         const statusElement = document.getElementById('roomStatus');
         if (statusElement) {
-            statusElement.textContent = '2分钟后清理';
+            statusElement.textContent = '已清理';
             statusElement.style.color = '#ff4d4f';
         }
-        
-        this.displaySystemMessage('⚠️ 聊天室2分钟后将自动清理');
-        
-        // 2分钟后刷新页面（模拟清理）
-        setTimeout(() => {
-            location.reload();
-        }, 2 * 60 * 1000);
-    }
-
-    // 保存消息到本地存储（模拟功能）
-    saveMessageToStorage(message) {
-        const key = `${this.currentRoom}_messages`;
-        let messages = JSON.parse(localStorage.getItem(key) || '[]');
-        messages.push(message);
-        localStorage.setItem(key, JSON.stringify(messages));
-    }
-
-    // 加载历史消息
-    loadHistoryMessages() {
-        const key = `${this.currentRoom}_messages`;
-        const messages = JSON.parse(localStorage.getItem(key) || '[]');
-        
-        messages.forEach(message => {
-            if (message.type === 'message') {
-                this.displayUserMessage(message);
-            }
-        });
     }
 }
 
@@ -212,7 +288,7 @@ function initRoomList() {
             <div class="room-icon">${room.icon}</div>
             <div class="room-info">
                 <h3>${room.name}</h3>
-                <p>${room.desc} · <span class="online-count">0</span>人在线 · <span class="status-text">活跃中</span></p >
+                <p>${room.desc} · <span class="online-count">0</span>人在线 · <span class="status-text">活跃中</span></p>
             </div>
         `;
         roomCard.onclick = () => enterRoom(room.id, room.name);
@@ -235,7 +311,6 @@ function createNewRoom() {
 
 // 页面加载完成后初始化
 document.addEventListener('DOMContentLoaded', function() {
-    // 如果是首页，初始化聊天室列表
     if (window.location.pathname.endsWith('index.html') || 
         window.location.pathname === '/' || 
         window.location.pathname.endsWith('/')) {
