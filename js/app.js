@@ -1,7 +1,7 @@
 // LeanCloud 配置
-const APP_ID = '你的AppID';
-const APP_KEY = '你的AppKey';
-const SERVER_URL = '你的ServerURL';
+const APP_ID = 'wanb2m8WLDHjpn2f6i8RY70n-MdYXbMMI';
+const APP_KEY = '9Aeas2PrP2Vsl1zeiZ5pXx0y';
+const SERVER_URL = 'https://wanb2m8w.api.lncldglobal.com';
 
 // 初始化 LeanCloud
 AV.init({
@@ -317,3 +317,4 @@ document.addEventListener('DOMContentLoaded', function() {
         initRoomList();
     }
 });
+
