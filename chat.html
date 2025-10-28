@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>聊天室</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="chat-container">
+        <!-- 聊天室头部 -->
+        <header class="chat-header">
+            <button class="back-btn" onclick="goBack()">← 返回</button>
+            <div class="room-title" id="roomTitle">聊天室</div>
+            <div class="room-status" id="roomStatus">活跃中</div>
+        </header>
+
+        <!-- 消息显示区域 -->
+        <div class="messages-container" id="messagesContainer">
+            <div class="system-message">
+                欢迎来到匿名聊天室！您的身份已随机生成，10分钟无人说话将自动清理。
+            </div>
+        </div>
+
+        <!-- 输入区域 -->
+        <div class="input-area">
+            <input type="text" class="message-input" id="messageInput" 
+                   placeholder="输入消息..." onkeypress="handleKeyPress(event)">
+            <button class="send-btn" id="sendBtn" onclick="sendMessage()">发送</button>
+        </div>
+    </div>
+
+    <!-- 引入JavaScript文件 -->
+    <script src="js/app.js"></script>
+    <script src="js/chat.js"></script>
+</body>
+</html>

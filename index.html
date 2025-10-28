@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>匿名聊天室</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- 页面头部 -->
+        <header class="header">
+            <h1>🐑 匿名聊天室</h1>
+            <p>畅所欲言，保护隐私 - 10分钟无人说话自动清理</p >
+        </header>
+
+        <!-- 聊天室列表 -->
+        <div class="room-list" id="roomList">
+            <!-- 聊天室会通过JavaScript动态添加到这里 -->
+        </div>
+
+        <!-- 创建新聊天室按钮 -->
+        <button class="create-room-btn" onclick="createNewRoom()">
+            + 创建新聊天室
+        </button>
+
+        <!-- 页面底部 -->
+        <footer class="footer">
+            <p>🔒 完全匿名 · ⏱️ 自动清理 · 🎭 随机身份</p >
+        </footer>
+    </div>
+
+    <!-- 引入JavaScript文件 -->
+    <script src="js/app.js"></script>
+</body>
+</html>
