@@ -4,36 +4,44 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>匿名聊天室</title>
-    <!-- 使用正确的CSS路径 -->
     <link rel="stylesheet" href="css/style.css">
-    <!-- 添加LeanCloud SDK -->
-    <script src="https://cdn.jsdelivr.net/npm/leancloud-storage@4.12.0/dist/av-min.js"></script>
 </head>
 <body>
     <div class="container">
-        <!-- 页面头部 -->
         <header class="header">
             <h1>🐑 匿名聊天室</h1>
-            <p>畅所欲言，保护隐私 - 10分钟无人说话自动清理</p>
+            <p>测试版本 - 基础功能</p>
         </header>
 
-        <!-- 聊天室列表 -->
-        <div class="room-list" id="roomList">
-            <!-- 聊天室会通过JavaScript动态添加到这里 -->
+        <div class="room-list">
+            <div class="room-card" onclick="enterRoom('general', '普通聊天室')">
+                <div class="room-icon">🏠</div>
+                <div class="room-info">
+                    <h3>普通聊天室</h3>
+                    <p>测试房间</p>
+                </div>
+            </div>
         </div>
 
-        <!-- 创建新聊天室按钮 -->
         <button class="create-room-btn" onclick="createNewRoom()">
             + 创建新聊天室
         </button>
-
-        <!-- 页面底部 -->
-        <footer class="footer">
-            <p>🔒 完全匿名 · ⏱️ 自动清理 · 🎭 随机身份</p>
-        </footer>
     </div>
 
-    <!-- 使用正确的JS路径 -->
-    <script src="js/app.js"></script>
+    <script>
+        // 最简单的进入房间函数
+        function enterRoom(roomId, roomName) {
+            console.log('进入房间:', roomId, roomName);
+            
+            // 直接使用URL参数传递
+            window.location.href = 'chat.html?roomId=' + encodeURIComponent(roomId) + '&roomName=' + encodeURIComponent(roomName);
+        }
+
+        function createNewRoom() {
+            const roomId = 'room_' + Date.now();
+            const roomName = '新聊天室';
+            enterRoom(roomId, roomName);
+        }
+    </script>
 </body>
 </html>
