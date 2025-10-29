@@ -9,53 +9,84 @@
 <body>
     <div class="chat-container">
         <header class="chat-header">
-            <button class="back-btn" onclick="goBack()">← 返回</button>
-            <div class="room-title" id="roomTitle">加载中...</div>
-            <div class="room-status" id="roomStatus">准备中</div>
+            <button class="back-btn" onclick="goBack()">← 返回首页</button>
+            <div class="room-title" id="roomTitle">匿名聊天室</div>
+            <div class="room-status" id="roomStatus">请先选择聊天室</div>
         </header>
 
         <div class="messages-container" id="messagesContainer">
-            <div class="system-message" id="statusMessage">
-                正在加载聊天室...
+            <div class="system-message" style="text-align: center; padding: 50px 20px;">
+                <h3>🚫 未选择聊天室</h3>
+                <p>您需要先从首页选择聊天室才能开始聊天</p>
+                <button onclick="goToHomePage()" style="background: #1890ff; color: white; border: none; padding: 10px 20px; border-radius: 20px; margin-top: 20px; cursor: pointer;">
+                    点击前往首页选择聊天室
+                </button>
             </div>
         </div>
 
-        <div class="input-area">
+        <div class="input-area" style="display: none;" id="inputArea">
             <input type="text" class="message-input" id="messageInput" placeholder="输入消息...">
             <button class="send-btn" onclick="sendMessage()">发送</button>
         </div>
     </div>
 
     <script>
-        // 从URL参数获取房间信息
-        function getRoomFromURL() {
+        // 检查是否有房间信息
+        function checkRoomInfo() {
+            // 方法1：检查URL参数
             const urlParams = new URLSearchParams(window.location.search);
             const roomId = urlParams.get('roomId');
             const roomName = urlParams.get('roomName');
             
-            console.log('从URL获取:', { roomId, roomName });
-            return { roomId, roomName };
+            // 方法2：检查sessionStorage
+            const storedRoomId = sessionStorage.getItem('currentRoom');
+            const storedRoomName = sessionStorage.getItem('roomName');
+            
+            console.log('URL参数:', { roomId, roomName });
+            console.log('sessionStorage:', { storedRoomId, storedRoomName });
+            
+            if (roomId && roomName) {
+                // 使用URL参数
+                setupChatRoom(roomId, roomName);
+            } else if (storedRoomId && storedRoomName) {
+                // 使用sessionStorage
+                setupChatRoom(storedRoomId, storedRoomName);
+            } else {
+                // 没有房间信息，显示提示
+                showNoRoomMessage();
+            }
         }
 
-        // 初始化聊天页面
-        function initChatPage() {
-            console.log('初始化聊天页面');
+        function setupChatRoom(roomId, roomName) {
+            console.log('设置聊天室:', roomId, roomName);
             
-            const { roomId, roomName } = getRoomFromURL();
-            
-            if (!roomId || !roomName) {
-                document.getElementById('statusMessage').textContent = '错误：未选择聊天室！';
-                document.getElementById('roomTitle').textContent = '错误';
-                console.error('缺少房间信息');
-                return;
-            }
-            
-            // 显示房间信息
+            // 更新页面显示
             document.getElementById('roomTitle').textContent = roomName;
-            document.getElementById('statusMessage').textContent = `欢迎进入 ${roomName}！`;
             document.getElementById('roomStatus').textContent = '已连接';
+            document.getElementById('inputArea').style.display = 'flex';
             
-            console.log('成功设置房间:', roomId, roomName);
+            // 隐藏错误消息，显示欢迎消息
+            const messagesContainer = document.getElementById('messagesContainer');
+            messagesContainer.innerHTML = `
+                <div class="system-message">
+                    欢迎来到 ${roomName}！您的身份已随机生成。
+                </div>
+                <div class="system-message">
+                    🔵🐑 蓝色绵羊代表男性，🌸🐑 粉色绵羊代表女性
+                </div>
+            `;
+            
+            // 设置输入框焦点
+            document.getElementById('messageInput').focus();
+        }
+
+        function showNoRoomMessage() {
+            // 保持显示的提示消息
+            console.log('没有房间信息，显示提示');
+        }
+
+        function goToHomePage() {
+            window.location.href = 'index.html';
         }
 
         function goBack() {
@@ -68,17 +99,42 @@
             
             if (content) {
                 const messagesContainer = document.getElementById('messagesContainer');
-                const messageElement = document.createElement('div');
-                messageElement.className = 'system-message';
-                messageElement.textContent = `测试消息: ${content}`;
-                messagesContainer.appendChild(messageElement);
                 
+                // 生成随机用户身份
+                const userNumber = Math.floor(Math.random() * 99 + 1).toString().padStart(2, '0');
+                const gender = Math.random() > 0.5 ? 'male' : 'female';
+                const avatar = gender === 'male' ? '🔵🐑' : '🌸🐑';
+                const color = gender === 'male' ? '#1890FF' : '#FF69B4';
+                
+                const messageElement = document.createElement('div');
+                messageElement.className = 'message';
+                messageElement.innerHTML = `
+                    <div class="message-avatar">${avatar}</div>
+                    <div class="message-content">
+                        <div class="message-user" style="color: ${color}">
+                            ${userNumber} ${avatar}
+                        </div>
+                        <div class="message-bubble">${content}</div>
+                    </div>
+                `;
+                
+                messagesContainer.appendChild(messageElement);
                 input.value = '';
+                
+                // 滚动到底部
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
             }
         }
 
-        // 页面加载完成后初始化
-        document.addEventListener('DOMContentLoaded', initChatPage);
+        // 处理键盘事件
+        document.addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        // 页面加载完成后检查房间信息
+        document.addEventListener('DOMContentLoaded', checkRoomInfo);
     </script>
 </body>
 </html>
