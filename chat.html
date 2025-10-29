@@ -4,37 +4,81 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>聊天室</title>
-    <!-- 使用正确的CSS路径 -->
     <link rel="stylesheet" href="css/style.css">
-    <!-- 添加LeanCloud SDK -->
-    <script src="https://cdn.jsdelivr.net/npm/leancloud-storage@4.12.0/dist/av-min.js"></script>
 </head>
 <body>
     <div class="chat-container">
-        <!-- 聊天室头部 -->
         <header class="chat-header">
             <button class="back-btn" onclick="goBack()">← 返回</button>
-            <div class="room-title" id="roomTitle">聊天室</div>
-            <div class="room-status" id="roomStatus">活跃中</div>
+            <div class="room-title" id="roomTitle">加载中...</div>
+            <div class="room-status" id="roomStatus">准备中</div>
         </header>
 
-        <!-- 消息显示区域 -->
         <div class="messages-container" id="messagesContainer">
-            <div class="system-message">
-                欢迎来到匿名聊天室！您的身份已随机生成，10分钟无人说话将自动清理。
+            <div class="system-message" id="statusMessage">
+                正在加载聊天室...
             </div>
         </div>
 
-        <!-- 输入区域 -->
         <div class="input-area">
-            <input type="text" class="message-input" id="messageInput" 
-                   placeholder="输入消息..." onkeypress="handleKeyPress(event)">
-            <button class="send-btn" id="sendBtn" onclick="sendMessage()">发送</button>
+            <input type="text" class="message-input" id="messageInput" placeholder="输入消息...">
+            <button class="send-btn" onclick="sendMessage()">发送</button>
         </div>
     </div>
 
-    <!-- 使用正确的JS路径 -->
-    <script src="js/app.js"></script>
-    <script src="js/chat.js"></script>
+    <script>
+        // 从URL参数获取房间信息
+        function getRoomFromURL() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const roomId = urlParams.get('roomId');
+            const roomName = urlParams.get('roomName');
+            
+            console.log('从URL获取:', { roomId, roomName });
+            return { roomId, roomName };
+        }
+
+        // 初始化聊天页面
+        function initChatPage() {
+            console.log('初始化聊天页面');
+            
+            const { roomId, roomName } = getRoomFromURL();
+            
+            if (!roomId || !roomName) {
+                document.getElementById('statusMessage').textContent = '错误：未选择聊天室！';
+                document.getElementById('roomTitle').textContent = '错误';
+                console.error('缺少房间信息');
+                return;
+            }
+            
+            // 显示房间信息
+            document.getElementById('roomTitle').textContent = roomName;
+            document.getElementById('statusMessage').textContent = `欢迎进入 ${roomName}！`;
+            document.getElementById('roomStatus').textContent = '已连接';
+            
+            console.log('成功设置房间:', roomId, roomName);
+        }
+
+        function goBack() {
+            window.location.href = 'index.html';
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const content = input.value.trim();
+            
+            if (content) {
+                const messagesContainer = document.getElementById('messagesContainer');
+                const messageElement = document.createElement('div');
+                messageElement.className = 'system-message';
+                messageElement.textContent = `测试消息: ${content}`;
+                messagesContainer.appendChild(messageElement);
+                
+                input.value = '';
+            }
+        }
+
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', initChatPage);
+    </script>
 </body>
 </html>
